@@ -78,10 +78,7 @@
                     
                     <!-- Mobile Controls -->
                     <div class="md:hidden flex flex-col gap-4 w-full">
-                        <!-- Start Button (Hidden if joining) -->
                         <button id="btn-start-mobile" onclick="createMeeting()" class="w-full py-3 px-6 bg-primary-600 text-white rounded-lg font-medium">Start Meeting</button>
-                        
-                        <!-- Join Controls -->
                         <input type="text" id="meeting-id-input-mobile" placeholder="Code" class="w-full py-3 px-4 bg-gray-800 border border-gray-700 rounded-lg">
                         <button id="btn-join-mobile" onclick="joinMeetingMobile()" class="w-full py-3 px-6 text-primary-500 font-medium bg-gray-800 rounded-lg">Join</button>
                     </div>
@@ -91,7 +88,6 @@
                     <label class="block text-sm font-medium text-gray-400 mb-2">Your Name</label>
                     <input type="text" id="display-name" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 mb-4 text-white" value="Guest">
                     
-                    <!-- Start Button (Hidden if joining) -->
                     <button id="btn-start-desktop" onclick="createMeeting()" class="w-full py-3.5 bg-primary-600 hover:bg-primary-500 text-white rounded-lg font-semibold mb-4">
                         Start New Meeting
                     </button>
@@ -135,16 +131,18 @@
         <!-- MEETING SCREEN -->
         <div id="meeting-screen" class="hidden flex-1 relative overflow-hidden bg-gray-900 flex-col">
             <div class="flex-1 relative overflow-hidden p-2 pb-24 flex items-center justify-center">
+                <!-- Floating Waiting Message (Only if alone) -->
                 <div id="waiting-message" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center z-0 hidden">
                     <div class="w-20 h-20 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
                         <i class="fas fa-users text-3xl text-gray-400"></i>
                     </div>
                     <h2 class="text-2xl font-semibold mb-2">Room Ready</h2>
                     <div class="flex items-center gap-2 bg-gray-800 p-2 rounded-lg max-w-md mx-auto border border-gray-700 cursor-pointer" onclick="copyMeetingLink()">
-                        <span id="display-meeting-id" class="font-mono text-sm text-primary-400 px-2 truncate max-w-[200px]">Loading...</span>
-                        <button class="text-sm font-semibold text-gray-300">Copy</button>
+                        <span class="font-mono text-sm text-primary-400 px-2 truncate">Copy Invite Link</span>
+                        <button class="text-sm font-semibold text-gray-300"><i class="far fa-copy"></i></button>
                     </div>
                 </div>
+                
                 <div id="video-grid" data-peers="1">
                     <div class="video-card" id="local-video-wrapper">
                         <video id="local-video" autoplay playsinline muted></video>
@@ -171,16 +169,30 @@
             </div>
 
             <!-- Controls -->
-            <div class="absolute bottom-0 left-0 right-0 h-20 bg-gray-900 border-t border-gray-800 flex items-center justify-between px-6 z-30">
-                <div class="hidden md:flex w-1/3 text-left text-xs text-gray-500">
-                    Server: <span id="server-indicator" class="ml-1 text-gray-300">Loading...</span>
+            <div class="absolute bottom-0 left-0 right-0 h-20 bg-gray-900 border-t border-gray-800 flex items-center justify-between px-4 md:px-6 z-30">
+                
+                <!-- NEW: Persistent Invite Button (Bottom Left) -->
+                <div class="flex w-1/3 text-left items-center gap-3">
+                    <button onclick="copyMeetingLink()" class="flex items-center gap-2 text-gray-300 hover:text-white transition px-2 py-2 rounded-lg hover:bg-gray-800 group">
+                        <div class="bg-primary-600/20 text-primary-500 p-2 rounded-md group-hover:bg-primary-600 group-hover:text-white transition">
+                            <i class="fas fa-link text-sm"></i>
+                        </div>
+                        <div class="hidden md:flex flex-col items-start">
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-gray-500 group-hover:text-gray-400">Invite</span>
+                            <span id="footer-meeting-id" class="text-sm font-mono font-semibold truncate max-w-[100px]">Loading...</span>
+                        </div>
+                    </button>
                 </div>
+
+                <!-- Media Controls -->
                 <div class="flex justify-center gap-3 w-full md:w-1/3">
                     <button onclick="toggleAudio()" id="btn-audio" class="w-12 h-12 rounded-full bg-gray-700 hover:bg-gray-600 transition"><i class="fas fa-microphone"></i></button>
                     <button onclick="toggleVideo()" id="btn-video" class="w-12 h-12 rounded-full bg-gray-700 hover:bg-gray-600 transition"><i class="fas fa-video"></i></button>
                     <button onclick="toggleScreenShare()" id="btn-screen" class="hidden md:block w-12 h-12 rounded-full bg-gray-700 hover:bg-gray-600 transition"><i class="fas fa-desktop"></i></button>
                     <button onclick="endCall()" class="w-14 h-12 rounded-full bg-red-600 hover:bg-red-500 transition ml-2"><i class="fas fa-phone-slash"></i></button>
                 </div>
+
+                <!-- Chat Toggle -->
                 <div class="flex justify-end w-1/3">
                     <button onclick="toggleChat()" class="relative w-12 h-12 rounded-full hover:bg-gray-800 text-gray-300 transition">
                         <i class="fas fa-comment-alt"></i>
@@ -196,10 +208,9 @@
     </div>
 
     <script>
-        // --- HARDCODED CONFIGURATION ---
-        // This ensures everyone connects to your specific VPS backend
+        // --- CONFIGURATION ---
         const DEFAULT_CONFIG = {
-            host: 'y0ws840wcwogowo0osc04440.xdots.co.zw', // Your backend domain
+            host: 'y0ws840wcwogowo0osc04440.xdots.co.zw', 
             port: 443,
             path: '/myapp'
         };
@@ -208,6 +219,7 @@
 
         // --- App State ---
         let myPeerId = null, peer = null, localStream = null, screenStream = null;
+        let activeRoomId = null; // The Room ID we are currently in (Host's ID)
         const peers = {}; 
         let isAudioEnabled = true, isVideoEnabled = true, isScreenSharing = false, isHost = false, myName = "Guest", isChatOpen = false;
 
@@ -227,25 +239,17 @@
             inputs.displayName.value = randomNames[Math.floor(Math.random() * randomNames.length)];
             if (!window.isSecureContext) document.getElementById('https-warning').classList.remove('hidden');
             
-            // Check for Saved Config (Optional override)
             const savedConf = localStorage.getItem('hollaCallerConfig');
-            if(savedConf) {
-                peerConfig = JSON.parse(savedConf);
-            }
+            if(savedConf) peerConfig = JSON.parse(savedConf);
 
-            // Init Config Modal Inputs
             inputs.confHost.value = peerConfig.host;
             inputs.confPort.value = peerConfig.port;
             inputs.confPath.value = peerConfig.path;
             
-            updateServerIndicator();
-
-            // Handle Invite Links
             const urlParams = new URLSearchParams(window.location.search);
             const meetingCode = urlParams.get('meeting');
             
             if (meetingCode) {
-                // Guest Mode: Someone clicked a link
                 inputs.meetingId.value = meetingCode;
                 if(document.getElementById('meeting-id-input-mobile')) document.getElementById('meeting-id-input-mobile').value = meetingCode;
 
@@ -269,8 +273,7 @@
         }
 
         function toggleConfig() {
-            const modal = document.getElementById('config-modal');
-            modal.classList.toggle('hidden');
+            document.getElementById('config-modal').classList.toggle('hidden');
         }
 
         function saveConfig() {
@@ -280,14 +283,8 @@
                 path: inputs.confPath.value
             };
             localStorage.setItem('hollaCallerConfig', JSON.stringify(peerConfig));
-            updateServerIndicator();
             toggleConfig();
             showToast("Server settings saved");
-        }
-
-        function updateServerIndicator() {
-            const ind = document.getElementById('server-indicator');
-            ind.innerText = peerConfig.host;
         }
 
         async function createMeeting() {
@@ -302,6 +299,7 @@
             if (!roomId) return showToast("Enter code");
             myName = inputs.displayName.value || "Guest";
             isHost = false;
+            activeRoomId = roomId; // We are joining this room
             showToast("Joining...", 1000);
             if(await startLocalStream()) initPeer(null, roomId);
         }
@@ -311,6 +309,7 @@
             if (!roomId) return showToast("Enter code");
             myName = "Mobile Guest";
             isHost = false;
+            activeRoomId = roomId;
             startLocalStream().then(ok => { if(ok) initPeer(null, roomId); });
         }
 
@@ -342,9 +341,16 @@
 
             peer.on('open', (id) => {
                 myPeerId = id;
-                const shareUrl = window.location.origin + window.location.pathname + '?meeting=' + id;
-                document.getElementById('display-meeting-id').innerText = shareUrl;
                 
+                // Determines what link we share
+                if (isHost) {
+                    activeRoomId = id; // I am the host, the room ID is MY ID
+                }
+                // If guest, activeRoomId was already set in joinMeeting()
+
+                // Update Footer UI
+                document.getElementById('footer-meeting-id').innerText = activeRoomId;
+
                 if (hostIdToConnect) connectToHost(hostIdToConnect);
                 else updatePeerCount();
             });
@@ -520,10 +526,13 @@
         }
 
         function endCall() { window.location.reload(); }
+
         function copyMeetingLink() {
-            const t = document.getElementById('display-meeting-id').innerText;
-            if(t && t!=='Loading...') navigator.clipboard.writeText(t).then(()=>showToast("Copied"));
+            if(!activeRoomId) return;
+            const url = window.location.origin + window.location.pathname + '?meeting=' + activeRoomId;
+            navigator.clipboard.writeText(url).then(()=>showToast("Link Copied to Clipboard!"));
         }
+
         function showToast(msg) {
             const t = document.getElementById('toast');
             document.getElementById('toast-message').innerText = msg;
