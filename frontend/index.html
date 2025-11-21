@@ -131,6 +131,7 @@
         <!-- MEETING SCREEN -->
         <div id="meeting-screen" class="hidden flex-1 relative overflow-hidden bg-gray-900 flex-col">
             <div class="flex-1 relative overflow-hidden p-2 pb-24 flex items-center justify-center">
+                <!-- Floating Waiting Message (Only if alone) -->
                 <div id="waiting-message" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center z-0 hidden">
                     <div class="w-20 h-20 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
                         <i class="fas fa-users text-3xl text-gray-400"></i>
@@ -374,6 +375,12 @@
                 conn.send({ type: 'join-request', name: myName, peerId: myPeerId });
             });
             handleDataConnection(conn);
+            
+            // --- CRITICAL FIX ---
+            // Automatically start video call to host
+            const call = peer.call(hostId, localStream, { metadata: { name: myName } });
+            handleCallStream(call);
+            // --------------------
         }
 
         function handleDataConnection(conn) {
