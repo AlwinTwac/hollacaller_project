@@ -41,8 +41,21 @@
 
         #video-grid {
             display: grid; gap: 0.5rem; width: 100%; height: 100%; padding: 0.5rem;
+            /* Added padding bottom to prevent videos hiding behind fixed controls */
+            padding-bottom: 6rem; 
             grid-template-columns: 1fr; grid-template-rows: 1fr;
             transition: all 0.3s ease;
+        }
+        
+        /* LIST VIEW OVERRIDES */
+        #video-grid.list-view {
+            display: flex !important;
+            flex-direction: column;
+            overflow-y: auto;
+            height: 100%;
+            grid-template-columns: none !important;
+            grid-template-rows: none !important;
+            padding-bottom: 100px; /* Extra padding for list view */
         }
         
         /* LIST VIEW OVERRIDES */
@@ -144,14 +157,15 @@
 </head>
 <body>
 
-    <div id="app" class="h-screen h-[100dvh] w-screen flex flex-col relative overflow-hidden">
+    <!-- FIX: Use fixed inset-0 to lock to viewport on mobile -->
+    <div id="app" class="fixed inset-0 w-full h-full flex flex-col relative overflow-hidden">
         
         <div id="https-warning" class="hidden bg-yellow-600 text-white text-sm py-2 px-4 text-center font-medium relative z-50">
             Security Warning: HTTPS is required. <button onclick="this.parentElement.style.display='none'" class="ml-4"><i class="fas fa-times"></i></button>
         </div>
 
         <!-- LOBBY SCREEN -->
-        <div id="lobby-screen" class="flex-1 flex flex-col items-center justify-center p-4 landing-bg h-full">
+        <div id="lobby-screen" class="flex-1 flex flex-col items-center justify-center p-4 landing-bg h-full overflow-y-auto">
             
             <div class="flex flex-col md:flex-row gap-16 items-center max-w-6xl w-full">
                 
@@ -203,6 +217,8 @@
 
         <!-- MEETING SCREEN -->
         <div id="meeting-screen" class="hidden h-full w-full flex flex-col overflow-hidden bg-gray-900">
+            
+            <!-- Video Area -->
             <div class="flex-1 relative overflow-hidden p-2 flex items-center justify-center min-h-0">
                 <div id="waiting-message" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center z-0 hidden">
                     <div class="w-20 h-20 bg-gray-800/80 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse border border-gray-700">
@@ -229,7 +245,7 @@
             </div>
             
             <!-- Chat Sidebar -->
-            <div id="chat-sidebar" class="absolute top-0 right-0 bottom-20 w-80 bg-gray-850 border-l border-gray-800 transform translate-x-full flex flex-col z-30 shadow-2xl">
+            <div id="chat-sidebar" class="absolute top-0 right-0 bottom-20 w-80 bg-gray-850 border-l border-gray-800 transform translate-x-full flex flex-col z-30 shadow-2xl" style="height: calc(100% - 5rem);">
                 <div class="p-4 border-b border-gray-800 flex justify-between items-center bg-gray-900/50">
                     <h3 class="font-semibold text-sm">Meeting Chat</h3>
                     <button onclick="toggleChat()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
@@ -267,8 +283,8 @@
                 </div>
             </div>
 
-            <!-- Controls Bar -->
-            <div class="h-20 shrink-0 bg-gray-900/95 backdrop-blur border-t border-gray-800 flex items-center justify-between px-4 md:px-8 z-30 relative w-full">
+            <!-- Controls Bar (FIXED POSITION) -->
+            <div class="fixed bottom-0 left-0 right-0 h-20 bg-gray-900/95 backdrop-blur border-t border-gray-800 flex items-center justify-between px-4 md:px-8 z-50 w-full safe-area-bottom">
                 <div class="flex w-1/3 text-left items-center gap-3">
                     <button onclick="copyMeetingLink()" class="flex items-center gap-3 text-gray-300 hover:text-white transition px-3 py-2 rounded-lg hover:bg-gray-800 group border border-transparent hover:border-gray-700">
                         <div class="bg-primary-600/10 text-primary-500 p-1.5 rounded-md group-hover:bg-primary-600 group-hover:text-white transition">
