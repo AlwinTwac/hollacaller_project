@@ -29,9 +29,10 @@
             background-color: #0b0f19; 
             color: white; 
             overflow: hidden; 
-            overscroll-behavior: none;
+            overscroll-behavior: none; /* Prevent pull-to-refresh on mobile */
         }
         
+        /* Custom Landing Background */
         .landing-bg {
             background-image: url('hollacaller.png');
             background-size: cover;
@@ -41,8 +42,6 @@
 
         #video-grid {
             display: grid; gap: 0.5rem; width: 100%; height: 100%; padding: 0.5rem;
-            /* Added padding bottom to prevent videos hiding behind fixed controls */
-            padding-bottom: 6rem; 
             grid-template-columns: 1fr; grid-template-rows: 1fr;
             transition: all 0.3s ease;
         }
@@ -55,18 +54,7 @@
             height: 100%;
             grid-template-columns: none !important;
             grid-template-rows: none !important;
-            padding-bottom: 100px; /* Extra padding for list view */
-        }
-        
-        /* LIST VIEW OVERRIDES */
-        #video-grid.list-view {
-            display: flex !important;
-            flex-direction: column;
-            overflow-y: auto;
-            height: 100%;
-            grid-template-columns: none !important;
-            grid-template-rows: none !important;
-            padding-bottom: 80px; 
+            padding-bottom: 20px;
         }
 
         #video-grid.list-view .video-card {
@@ -76,22 +64,19 @@
             margin-bottom: 0.5rem;
         }
 
-        /* Grid Layouts */
+        /* Standard Grid Layouts (Reverted to standard behavior for stability) */
         #video-grid[data-peers="1"] { grid-template-columns: 1fr; }
         #video-grid[data-peers="2"] { grid-template-columns: 1fr 1fr; }
         #video-grid[data-peers="3"] { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
         #video-grid[data-peers="4"] { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
         #video-grid[data-peers="5"] { grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr; }
         #video-grid[data-peers="6"] { grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr; }
-
-        @media (max-width: 768px) {
-            #video-grid:not(.list-view)[data-peers="2"] { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
-            #video-grid:not(.list-view)[data-peers="3"], #video-grid:not(.list-view)[data-peers="4"] {
-                grid-template-columns: 1fr;
-                grid-template-rows: repeat(auto-fit, minmax(0, 1fr));
-            }
-        }
         
+        /* Mobile specific tweaks just to ensure fit, not change layout structure */
+        @media (max-width: 640px) {
+             #video-grid[data-peers="2"] { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+        }
+
         .video-card {
             position: relative; background: #000; border-radius: 0.75rem; overflow: hidden;
             width: 100%; height: 100%; border: 1px solid rgba(255,255,255,0.1);
@@ -102,7 +87,7 @@
         .video-card.pinned {
             position: absolute; top: 0; left: 0; right: 0; bottom: 0;
             width: 100% !important; height: 100% !important;
-            z-index: 50; border-radius: 0; border: none;
+            z-index: 40; border-radius: 0; border: none;
         }
 
         .video-card.hidden-video video { opacity: 0; }
@@ -120,6 +105,7 @@
             font-size: 0.875rem; font-weight: 500; z-index: 10; display: flex; align-items: center; gap: 0.5rem;
         }
         
+        /* High Contrast Controls */
         .video-controls {
             position: absolute; top: 10px; right: 10px; z-index: 20;
             display: flex; gap: 0.5rem; opacity: 0; transition: opacity 0.2s;
@@ -135,30 +121,25 @@
         }
         .control-btn:hover { background: #2563eb; border-color: #60a5fa; transform: scale(1.05); }
 
-        #chat-sidebar { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        #chat-sidebar { 
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+            z-index: 60; /* Higher than controls (30) */
+        }
         
-        /* Emoji Picker Styles */
         .emoji-grid {
-            display: grid;
-            grid-template-columns: repeat(6, 1fr);
-            gap: 0.5rem;
-            max-height: 200px;
-            overflow-y: auto;
+            display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.5rem;
+            max-height: 200px; overflow-y: auto;
         }
         .emoji-btn {
-            font-size: 1.25rem;
-            padding: 0.25rem;
-            border-radius: 0.375rem;
-            cursor: pointer;
-            text-align: center;
+            font-size: 1.25rem; padding: 0.25rem; border-radius: 0.375rem; cursor: pointer; text-align: center;
         }
         .emoji-btn:hover { background-color: #374151; }
     </style>
 </head>
 <body>
 
-    <!-- FIX: Use fixed inset-0 to lock to viewport on mobile -->
-    <div id="app" class="fixed inset-0 w-full h-full flex flex-col relative overflow-hidden">
+    <!-- FIX: Use h-[100dvh] for proper mobile sizing including address bar -->
+    <div id="app" class="w-full h-[100dvh] flex flex-col relative overflow-hidden bg-gray-900">
         
         <div id="https-warning" class="hidden bg-yellow-600 text-white text-sm py-2 px-4 text-center font-medium relative z-50">
             Security Warning: HTTPS is required. <button onclick="this.parentElement.style.display='none'" class="ml-4"><i class="fas fa-times"></i></button>
@@ -216,9 +197,9 @@
         </div>
 
         <!-- MEETING SCREEN -->
-        <div id="meeting-screen" class="hidden h-full w-full flex flex-col overflow-hidden bg-gray-900">
+        <div id="meeting-screen" class="hidden flex-1 w-full flex flex-col overflow-hidden bg-gray-900 relative">
             
-            <!-- Video Area -->
+            <!-- Video Area (Flex Grow - Ensures it takes remaining space) -->
             <div class="flex-1 relative overflow-hidden p-2 flex items-center justify-center min-h-0">
                 <div id="waiting-message" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center z-0 hidden">
                     <div class="w-20 h-20 bg-gray-800/80 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse border border-gray-700">
@@ -244,47 +225,8 @@
                 </div>
             </div>
             
-            <!-- Chat Sidebar -->
-            <div id="chat-sidebar" class="absolute top-0 right-0 bottom-20 w-80 bg-gray-850 border-l border-gray-800 transform translate-x-full flex flex-col z-30 shadow-2xl" style="height: calc(100% - 5rem);">
-                <div class="p-4 border-b border-gray-800 flex justify-between items-center bg-gray-900/50">
-                    <h3 class="font-semibold text-sm">Meeting Chat</h3>
-                    <button onclick="toggleChat()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
-                </div>
-                
-                <div class="flex-1 overflow-y-auto p-4 space-y-4" id="chat-messages"></div>
-                
-                <!-- Emoji Picker Container (Hidden by default) -->
-                <div id="emoji-picker" class="hidden absolute bottom-20 left-4 right-4 bg-gray-800 border border-gray-700 rounded-lg shadow-xl p-2 z-40">
-                    <div class="emoji-grid" id="emoji-grid">
-                        <!-- Emojis injected by JS -->
-                    </div>
-                </div>
-
-                <!-- Chat Input Area -->
-                <div class="p-3 border-t border-gray-800 bg-gray-900/50">
-                    <form onsubmit="sendChatMessage(event)" class="relative flex gap-2 items-center">
-                        <!-- File Upload (Hidden) -->
-                        <input type="file" id="chat-file-input" class="hidden" onchange="handleFileUpload(this)">
-                        <button type="button" onclick="document.getElementById('chat-file-input').click()" class="text-gray-400 hover:text-white p-1.5 rounded hover:bg-gray-800 transition" title="Send File">
-                            <i class="fas fa-paperclip"></i>
-                        </button>
-                        
-                        <!-- Emoji Button -->
-                        <button type="button" onclick="toggleEmojiPicker()" class="text-gray-400 hover:text-yellow-400 p-1.5 rounded hover:bg-gray-800 transition" title="Insert Emoji">
-                            <i class="far fa-smile"></i>
-                        </button>
-
-                        <input type="text" id="chat-input" placeholder="Message..." class="w-full bg-gray-900 border border-gray-700 rounded-full px-3 py-2 focus:outline-none focus:border-primary-500 text-sm transition">
-                        
-                        <button type="submit" class="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-white hover:bg-primary-500 transition flex-shrink-0">
-                            <i class="fas fa-paper-plane text-xs"></i>
-                        </button>
-                    </form>
-                </div>
-            </div>
-
-            <!-- Controls Bar (FIXED POSITION) -->
-            <div class="fixed bottom-0 left-0 right-0 h-20 bg-gray-900/95 backdrop-blur border-t border-gray-800 flex items-center justify-between px-4 md:px-8 z-50 w-full safe-area-bottom">
+            <!-- Controls Bar (FLEX ITEM - Sticks to bottom naturally) -->
+            <div class="h-20 shrink-0 bg-gray-900/95 backdrop-blur border-t border-gray-800 flex items-center justify-between px-4 md:px-8 z-30 w-full">
                 <div class="flex w-1/3 text-left items-center gap-3">
                     <button onclick="copyMeetingLink()" class="flex items-center gap-3 text-gray-300 hover:text-white transition px-3 py-2 rounded-lg hover:bg-gray-800 group border border-transparent hover:border-gray-700">
                         <div class="bg-primary-600/10 text-primary-500 p-1.5 rounded-md group-hover:bg-primary-600 group-hover:text-white transition">
@@ -312,6 +254,43 @@
                         <i class="fas fa-comment-alt text-lg"></i>
                         <span id="chat-badge" class="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 border-2 border-gray-900 rounded-full hidden"></span>
                     </button>
+                </div>
+            </div>
+
+            <!-- Chat Sidebar (HIGH Z-INDEX) -->
+            <div id="chat-sidebar" class="absolute top-0 right-0 bottom-0 w-full md:w-80 bg-gray-850 border-l border-gray-800 transform translate-x-full flex flex-col shadow-2xl">
+                <div class="p-4 border-b border-gray-800 flex justify-between items-center bg-gray-900/50">
+                    <h3 class="font-semibold text-sm">Meeting Chat</h3>
+                    <button onclick="toggleChat()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
+                </div>
+                
+                <div class="flex-1 overflow-y-auto p-4 space-y-4" id="chat-messages"></div>
+                
+                <!-- Emoji Picker Container (Hidden by default) -->
+                <div id="emoji-picker" class="hidden absolute bottom-20 left-4 right-4 bg-gray-800 border border-gray-700 rounded-lg shadow-xl p-2 z-50">
+                    <div class="emoji-grid" id="emoji-grid"></div>
+                </div>
+
+                <!-- Chat Input Area -->
+                <div class="p-3 border-t border-gray-800 bg-gray-900/50">
+                    <form onsubmit="sendChatMessage(event)" class="relative flex gap-2 items-center">
+                        <!-- File Upload -->
+                        <input type="file" id="chat-file-input" class="hidden" onchange="handleFileUpload(this)">
+                        <button type="button" onclick="document.getElementById('chat-file-input').click()" class="text-gray-400 hover:text-white p-1.5 rounded hover:bg-gray-800 transition">
+                            <i class="fas fa-paperclip"></i>
+                        </button>
+                        
+                        <!-- Emoji Button -->
+                        <button type="button" onclick="toggleEmojiPicker()" class="text-gray-400 hover:text-yellow-400 p-1.5 rounded hover:bg-gray-800 transition">
+                            <i class="far fa-smile"></i>
+                        </button>
+
+                        <input type="text" id="chat-input" placeholder="Message..." class="w-full bg-gray-900 border border-gray-700 rounded-full px-3 py-2 focus:outline-none focus:border-primary-500 text-sm transition">
+                        
+                        <button type="submit" class="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-white hover:bg-primary-500 transition flex-shrink-0">
+                            <i class="fas fa-paper-plane text-xs"></i>
+                        </button>
+                    </form>
                 </div>
             </div>
         </div>
