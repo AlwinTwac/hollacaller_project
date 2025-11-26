@@ -89,7 +89,7 @@
             font-size: 0.875rem; font-weight: 500; z-index: 10; display: flex; align-items: center; gap: 0.5rem;
         }
         
-        /* Video Controls Overlay */
+        /* Video Controls Overlay - HIGH VISIBILITY FIX */
         .video-controls {
             position: absolute; top: 10px; right: 10px; z-index: 20;
             display: flex; gap: 0.5rem;
@@ -99,13 +99,19 @@
         .video-card.pinned .video-controls { opacity: 1; }
 
         .control-btn {
-            background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
-            width: 28px; height: 28px; border-radius: 6px;
+            background: rgba(17, 24, 39, 0.9); /* Dark, nearly opaque background */
+            width: 32px; height: 32px; border-radius: 8px;
             display: flex; align-items: center; justify-content: center;
-            cursor: pointer; color: white; font-size: 0.75rem;
-            border: 1px solid rgba(255,255,255,0.1);
+            cursor: pointer; color: white; font-size: 0.875rem;
+            border: 1px solid rgba(255,255,255,0.3); /* More visible border */
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5); /* Drop shadow for contrast against white */
+            transition: all 0.2s;
         }
-        .control-btn:hover { background: rgba(255,255,255,0.2); }
+        .control-btn:hover { 
+            background: #2563eb; /* Blue on hover */
+            border-color: #60a5fa; 
+            transform: scale(1.05);
+        }
 
         #chat-sidebar { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
     </style>
@@ -149,7 +155,7 @@
                 <div class="hidden md:block w-full max-w-sm">
                     <div class="mb-4">
                         <label class="block text-[10px] font-bold text-gray-300 mb-1 uppercase tracking-wider drop-shadow-md">Your Name</label>
-                        <input type="text" id="display-name" class="w-full bg-gray-900/60 border border-gray-500 rounded-md px-3 py-2 text-sm text-white focus:border-primary-500 focus:bg-gray-900/80 outline-none transition backdrop-blur-sm" value="Guest">
+                        <input type="text" id="display-name" class="w-full bg-gray-900/60 border border-gray-500 rounded-md px-3 py-2 text-sm text-white focus:border-primary-500 focus:bg-gray-900/80 outline-none transition backdrop-blur-sm" placeholder="Enter your name">
                     </div>
                     
                     <button id="btn-start-desktop" onclick="createMeeting()" class="w-auto px-6 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-md font-medium text-sm shadow-lg transition-all hover:-translate-y-0.5">
@@ -287,16 +293,7 @@
                 document.getElementById('https-warning').classList.remove('hidden');
             }
             
-            // Random Name
-            const randomNames = ["Alex", "Sam", "Jordan", "Riley", "Morgan", "Casey"];
-            const randomName = randomNames[Math.floor(Math.random() * randomNames.length)];
-            
-            // Set Desktop Input
-            inputs.displayName.value = randomName;
-            
-            // Set Mobile Input (if exists)
-            const mobileNameInput = document.getElementById('display-name-mobile');
-            if(mobileNameInput) mobileNameInput.value = randomName;
+            // FIXED: Removed random name generation. Inputs start empty.
 
             // Check URL for Invite
             const urlParams = new URLSearchParams(window.location.search);
@@ -327,14 +324,13 @@
         async function createMeeting() {
             // Check visible input for name
             const mobileInput = document.getElementById('display-name-mobile');
-            // If mobile input is visible (md:hidden is active), use it, otherwise use desktop input
-            // Simple logic: if mobile input has value and is on screen, prefer it? 
-            // Actually, checking which view is active is complex in js.
-            // Let's just take the value from whichever input the user likely typed in.
-            if (mobileInput && mobileInput.value !== inputs.displayName.value && mobileInput.offsetParent !== null) {
-                 myName = mobileInput.value || "Host";
+            // If mobile input is visible and populated, use it
+            if (mobileInput && mobileInput.value.trim() && mobileInput.offsetParent !== null) {
+                 myName = mobileInput.value.trim();
+            } else if (inputs.displayName.value.trim()) {
+                 myName = inputs.displayName.value.trim();
             } else {
-                 myName = inputs.displayName.value || "Host";
+                 myName = "Host"; // Default if empty
             }
 
             isHost = true;
@@ -345,7 +341,13 @@
         async function joinMeeting() {
             const roomId = inputs.meetingId.value.trim();
             if (!roomId) return showToast("Please enter a valid code");
-            myName = inputs.displayName.value || "Guest";
+            
+            if(inputs.displayName.value.trim()) {
+                myName = inputs.displayName.value.trim();
+            } else {
+                myName = "Guest";
+            }
+
             isHost = false;
             activeRoomId = roomId; 
             showToast("Connecting to room...");
@@ -461,7 +463,10 @@
                 
                 // Guest Logic: Receive list of other users to call
                 if(data.type === 'user-list' && data.users) {
-                    data.users.forEach(uid => connectToPeer(uid));
+                    data.users.forEach(uid => {
+                        // FIXED: Prevent duplicate "ghost" entries by ignoring our own ID
+                        if (uid !== myPeerId) connectToPeer(uid);
+                    });
                 }
                 
                 // Chat
