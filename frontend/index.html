@@ -31,7 +31,7 @@
             overflow: hidden; 
         }
         
-        /* Custom Landing Background - No Overlay */
+        /* Custom Landing Background */
         .landing-bg {
             background-image: url('hollacaller.png');
             background-size: cover;
@@ -42,6 +42,7 @@
         #video-grid {
             display: grid; gap: 1rem; width: 100%; height: 100%; padding: 1rem;
             grid-template-columns: 1fr; grid-template-rows: 1fr;
+            transition: all 0.3s ease;
         }
         /* Dynamic Grid Layouts */
         #video-grid[data-peers="1"] { grid-template-columns: 1fr; }
@@ -55,10 +56,31 @@
             position: relative; background: #000; border-radius: 0.75rem; overflow: hidden;
             width: 100%; height: 100%; border: 1px solid rgba(255,255,255,0.1);
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+            transition: all 0.3s ease;
         }
         
-        /* FIX: Mirror class only applied when needed (Webcam = Yes, Screen = No) */
-        video { width: 100%; height: 100%; object-fit: cover; }
+        /* Pinned/Maximized State */
+        .video-card.pinned {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            width: 100% !important;
+            height: 100% !important;
+            z-index: 50;
+            border-radius: 0;
+            border: none;
+        }
+
+        /* Hidden Video State */
+        .video-card.hidden-video video {
+            opacity: 0;
+        }
+        .video-card.hidden-video::after {
+            content: "Video Hidden";
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            color: #6b7280; font-size: 0.875rem;
+        }
+        
+        video { width: 100%; height: 100%; object-fit: cover; transition: opacity 0.3s; }
         .mirror-mode { transform: scaleX(-1); } 
 
         .user-label {
@@ -67,10 +89,23 @@
             font-size: 0.875rem; font-weight: 500; z-index: 10; display: flex; align-items: center; gap: 0.5rem;
         }
         
-        /* Mute Button for Host */
-        .host-controls {
+        /* Video Controls Overlay */
+        .video-controls {
             position: absolute; top: 10px; right: 10px; z-index: 20;
+            display: flex; gap: 0.5rem;
+            opacity: 0; transition: opacity 0.2s;
         }
+        .video-card:hover .video-controls { opacity: 1; }
+        .video-card.pinned .video-controls { opacity: 1; }
+
+        .control-btn {
+            background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+            width: 28px; height: 28px; border-radius: 6px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; color: white; font-size: 0.75rem;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .control-btn:hover { background: rgba(255,255,255,0.2); }
 
         #chat-sidebar { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
     </style>
@@ -96,7 +131,7 @@
                     </h1>
                     <p id="hero-text" class="hidden"></p>
                     
-                    <!-- Mobile Controls (Compact) -->
+                    <!-- Mobile Controls -->
                     <div class="md:hidden flex flex-col gap-3 w-full items-center">
                         <button id="btn-start-mobile" onclick="createMeeting()" class="w-auto px-6 py-2 bg-primary-600 text-white rounded-lg font-medium shadow-lg text-sm">Start Meeting</button>
                         <input type="text" id="meeting-id-input-mobile" placeholder="Enter Code" class="w-full max-w-xs py-2 px-4 bg-gray-800/80 border border-gray-600 rounded-lg text-center text-sm placeholder-gray-400 focus:border-primary-500 outline-none text-white">
@@ -104,7 +139,7 @@
                     </div>
                 </div>
 
-                <!-- Desktop Controls (Invisible Background & Compact) -->
+                <!-- Desktop Controls -->
                 <div class="hidden md:block w-full max-w-sm">
                     <div class="mb-4">
                         <label class="block text-[10px] font-bold text-gray-300 mb-1 uppercase tracking-wider drop-shadow-md">Your Name</label>
@@ -153,6 +188,10 @@
                     <!-- Local Video -->
                     <div class="video-card" id="local-video-wrapper">
                         <video id="local-video" class="mirror-mode" autoplay playsinline muted></video>
+                        <div class="video-controls">
+                            <button onclick="togglePin('local-video-wrapper')" class="control-btn" title="Maximize"><i class="fas fa-expand"></i></button>
+                            <button onclick="toggleHideVideo('local-video-wrapper')" class="control-btn" title="Hide Video"><i class="fas fa-eye-slash"></i></button>
+                        </div>
                         <div class="user-label"><span>You</span></div>
                     </div>
                 </div>
@@ -305,6 +344,10 @@
                 v.srcObject = localStream;
                 v.muted = true; // Mute local echo
                 
+                // Update local label with name immediately
+                const localLabel = document.querySelector('#local-video-wrapper .user-label span');
+                if(localLabel) localLabel.innerText = `You (${myName})`;
+
                 document.getElementById('lobby-screen').classList.add('hidden');
                 document.getElementById('meeting-screen').classList.remove('hidden');
                 document.getElementById('meeting-screen').classList.add('flex');
@@ -354,6 +397,9 @@
             // 1. Data Connection
             const conn = peer.connect(hostId, { metadata: { name: myName } });
             conn.on('open', () => {
+                // Handshake: Send our name immediately
+                conn.send({ type: 'handshake', name: myName, peerId: myPeerId });
+                // Also send join request for host logic
                 conn.send({ type: 'join-request', name: myName, peerId: myPeerId });
             });
             handleDataConnection(conn);
@@ -367,7 +413,18 @@
         }
 
         function handleDataConnection(conn) {
+            conn.on('open', () => {
+                // Send handshake on any new connection
+                conn.send({ type: 'handshake', name: myName, peerId: myPeerId });
+            });
+
             conn.on('data', (data) => {
+                // Handshake: Update Peer Name
+                if(data.type === 'handshake') {
+                    const peerId = data.peerId || conn.peer;
+                    updatePeerName(peerId, data.name);
+                }
+
                 // Host Logic: Introduce new user to existing users
                 if(data.type === 'join-request' && isHost) {
                     const existing = Object.keys(peers);
@@ -398,6 +455,14 @@
             });
         }
 
+        function updatePeerName(peerId, name) {
+            const el = document.getElementById(`c-${peerId}`);
+            if(el) {
+                const label = el.querySelector('.user-label');
+                if(label) label.innerHTML = `<i class="fas fa-user text-xs"></i> ${name}`;
+            }
+        }
+
         function connectToPeer(peerId) {
             if (peers[peerId]) return; // Already connected
             // Peer-to-peer mesh connection
@@ -410,7 +475,8 @@
 
         function handleCallStream(call) {
             const rid = call.peer;
-            let rName = (call.metadata && call.metadata.name) ? call.metadata.name : "User";
+            // Initial fallback name from metadata (might be updated later via handshake)
+            let rName = (call.metadata && call.metadata.name) ? call.metadata.name : "Connecting...";
 
             call.on('stream', (rStream) => {
                 // DUPLICATION FIX: Check if video already exists
@@ -421,14 +487,18 @@
                 div.id = `c-${rid}`;
                 
                 // Host controls
-                let muteBtnHtml = '';
+                let hostControls = '';
                 if(isHost) {
-                    muteBtnHtml = `<button onclick="forceMute('${rid}')" class="host-controls bg-red-600 hover:bg-red-500 text-white text-xs px-2 py-1 rounded shadow">Mute</button>`;
+                    hostControls = `<button onclick="forceMute('${rid}')" class="control-btn" title="Mute User"><i class="fas fa-microphone-slash"></i></button>`;
                 }
 
                 div.innerHTML = `
                     <video autoplay playsinline></video>
-                    ${muteBtnHtml}
+                    <div class="video-controls">
+                        <button onclick="togglePin('${rid}')" class="control-btn" title="Maximize"><i class="fas fa-expand"></i></button>
+                        <button onclick="toggleHideVideo('${rid}')" class="control-btn" title="Hide Video"><i class="fas fa-eye-slash"></i></button>
+                        ${hostControls}
+                    </div>
                     <div class="user-label">
                         <i class="fas fa-user text-xs"></i> ${rName}
                     </div>`;
@@ -467,6 +537,55 @@
             videoGrid.setAttribute('data-peers', c);
             if(c > 1) document.getElementById('waiting-message').classList.add('hidden');
             else document.getElementById('waiting-message').classList.remove('hidden');
+        }
+
+        // --- Enhanced Video Controls ---
+
+        function togglePin(id) {
+            const card = document.getElementById(id === 'local-video-wrapper' ? 'local-video-wrapper' : `c-${id}`);
+            if(!card) return;
+            
+            // Remove pin from any other card first
+            document.querySelectorAll('.video-card.pinned').forEach(el => {
+                if(el !== card) {
+                    el.classList.remove('pinned');
+                    const btn = el.querySelector('.video-controls button i.fa-compress');
+                    if(btn) {
+                        btn.classList.remove('fa-compress');
+                        btn.classList.add('fa-expand');
+                    }
+                }
+            });
+
+            // Toggle current
+            card.classList.toggle('pinned');
+            
+            // Update icon
+            const btnIcon = card.querySelector('.video-controls button i');
+            if(card.classList.contains('pinned')) {
+                btnIcon.classList.remove('fa-expand');
+                btnIcon.classList.add('fa-compress');
+            } else {
+                btnIcon.classList.remove('fa-compress');
+                btnIcon.classList.add('fa-expand');
+            }
+        }
+
+        function toggleHideVideo(id) {
+            const card = document.getElementById(id === 'local-video-wrapper' ? 'local-video-wrapper' : `c-${id}`);
+            if(!card) return;
+            
+            card.classList.toggle('hidden-video');
+            
+            // Update icon
+            const btnIcon = card.querySelectorAll('.video-controls button i')[1]; // 2nd button
+            if(card.classList.contains('hidden-video')) {
+                btnIcon.classList.remove('fa-eye-slash');
+                btnIcon.classList.add('fa-eye');
+            } else {
+                btnIcon.classList.remove('fa-eye');
+                btnIcon.classList.add('fa-eye-slash');
+            }
         }
 
         // --- Actions ---
