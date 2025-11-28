@@ -134,6 +134,14 @@
             font-size: 1.25rem; padding: 0.25rem; border-radius: 0.375rem; cursor: pointer; text-align: center;
         }
         .emoji-btn:hover { background-color: #374151; }
+
+        /* Login Screen */
+        #login-screen {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #0b0f19; z-index: 100;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 1rem;
+        }
     </style>
 </head>
 <body>
@@ -145,8 +153,27 @@
             Security Warning: HTTPS is required. <button onclick="this.parentElement.style.display='none'" class="ml-4"><i class="fas fa-times"></i></button>
         </div>
 
+        <!-- LOGIN SCREEN -->
+        <div id="login-screen">
+            <div class="bg-gray-800 p-8 rounded-xl border border-gray-700 shadow-2xl w-full max-w-md">
+                <h2 class="text-2xl font-bold mb-6 text-center text-white">HollaCaller Login</h2>
+                <p class="text-gray-400 mb-6 text-sm text-center">Enter your email to access the secure portal.</p>
+
+                <form onsubmit="handleLogin(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Email Address</label>
+                        <input type="email" id="login-email" required class="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none" placeholder="you@example.com">
+                    </div>
+                    <button type="submit" id="btn-login" class="w-full bg-primary-600 hover:bg-primary-500 text-white py-2 rounded-lg font-medium transition">
+                        Enter
+                    </button>
+                </form>
+                <div id="login-error" class="mt-4 text-red-500 text-sm text-center hidden"></div>
+            </div>
+        </div>
+
         <!-- LOBBY SCREEN -->
-        <div id="lobby-screen" class="flex-1 flex flex-col items-center justify-center p-4 landing-bg h-full overflow-y-auto">
+        <div id="lobby-screen" class="hidden flex-1 flex flex-col items-center justify-center p-4 landing-bg h-full overflow-y-auto">
             
             <div class="flex flex-col md:flex-row gap-16 items-center max-w-6xl w-full">
                 
@@ -156,12 +183,13 @@
                         <span class="text-primary-500 text-3xl md:text-4xl">Fast and Low Latency Conferencing</span>
                     </h1>
                     <p id="hero-text" class="hidden"></p>
+                    <div class="text-gray-300 mb-4 font-semibold text-lg">Welcome, <span id="user-name-display" class="text-white">User</span></div>
                     
                     <!-- Mobile Controls -->
                     <div class="md:hidden flex flex-col gap-3 w-full items-center">
                         <button id="btn-start-mobile" onclick="createMeeting()" class="w-auto px-6 py-2 bg-primary-600 text-white rounded-lg font-medium shadow-lg text-sm">Start Meeting</button>
                         <div class="w-full max-w-xs border-t border-gray-600/50 my-2"></div>
-                        <input type="text" id="display-name-mobile" placeholder="Your Name" class="w-full max-w-xs py-2 px-4 bg-gray-800/80 border border-gray-600 rounded-lg text-center text-sm placeholder-gray-400 focus:border-primary-500 outline-none text-white">
+                        <!-- Name input removed as it comes from DB -->
                         <input type="text" id="meeting-id-input-mobile" placeholder="Enter Code" class="w-full max-w-xs py-2 px-4 bg-gray-800/80 border border-gray-600 rounded-lg text-center text-sm placeholder-gray-400 focus:border-primary-500 outline-none text-white">
                         <button id="btn-join-mobile" onclick="joinMeetingMobile()" class="w-auto px-6 py-2 text-white font-medium bg-gray-800 hover:bg-gray-700 rounded-lg border border-gray-700 text-sm">Join</button>
                     </div>
@@ -169,10 +197,7 @@
 
                 <!-- Desktop Controls -->
                 <div class="hidden md:block w-full max-w-sm">
-                    <div class="mb-4">
-                        <label class="block text-[10px] font-bold text-gray-300 mb-1 uppercase tracking-wider drop-shadow-md">Your Name</label>
-                        <input type="text" id="display-name" class="w-full bg-gray-900/60 border border-gray-500 rounded-md px-3 py-2 text-sm text-white focus:border-primary-500 focus:bg-gray-900/80 outline-none transition backdrop-blur-sm" placeholder="Enter your name">
-                    </div>
+                    <!-- Name input removed -->
                     
                     <button id="btn-start-desktop" onclick="createMeeting()" class="w-auto px-6 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-md font-medium text-sm shadow-lg transition-all hover:-translate-y-0.5">
                         Start Instant Meeting
@@ -303,11 +328,17 @@
 
     <script>
         // --- CONFIGURATION ---
+        // Automatically determine the host based on where the app is served from
+        const isLocalhost = window.location.hostname === 'localhost';
         const peerConfig = {
-            host: 'y0ws840wcwogowo0osc04440.xdots.co.zw', 
-            port: 443,
-            path: '/myapp'
+            host: window.location.hostname,
+            port: window.location.port || (window.location.protocol === 'https:' ? 443 : 80),
+            path: '/myapp/peerjs'
         };
+        // Note: server.js uses app.use('/peerjs', peerServer) and path: '/myapp' inside peerServer options
+        // This usually means the endpoint is /peerjs/myapp/....
+        // Or if peerServer path is /myapp, and app uses /peerjs, then /peerjs/myapp
+        // Let's verify standard PeerJS express mounting.
 
         // --- App State ---
         let myPeerId = null, peer = null, localStream = null, screenStream = null;
@@ -315,11 +346,12 @@
         const peers = {}; 
         let isAudioEnabled = true, isVideoEnabled = true, isScreenSharing = false, isHost = false, myName = "Guest", isChatOpen = false;
         let isListView = false;
+        let currentUserEmail = null;
         
         const videoGrid = document.getElementById('video-grid');
         const inputs = {
             meetingId: document.getElementById('meeting-id-input'),
-            displayName: document.getElementById('display-name'),
+            // displayName: document.getElementById('display-name'), // Removed
             chat: document.getElementById('chat-input')
         };
 
@@ -345,8 +377,7 @@
                 emojiGrid.appendChild(span);
             });
 
-            // Random Name removed (Inputs start empty)
-
+            // Handle Meeting ID in URL
             const urlParams = new URLSearchParams(window.location.search);
             const meetingCode = urlParams.get('meeting');
             
@@ -371,47 +402,75 @@
             }
         }
 
-        async function createMeeting() {
-            const mobileInput = document.getElementById('display-name-mobile');
-            if (mobileInput && mobileInput.value.trim() && mobileInput.offsetParent !== null) {
-                 myName = mobileInput.value.trim();
-            } else if (inputs.displayName.value.trim()) {
-                 myName = inputs.displayName.value.trim();
-            } else {
-                 myName = "Host"; 
-            }
+        async function handleLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value.trim();
+            const btn = document.getElementById('btn-login');
+            const errorDiv = document.getElementById('login-error');
 
+            if(!email) return;
+
+            btn.disabled = true;
+            btn.innerText = "Verifying...";
+            errorDiv.classList.add('hidden');
+
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+
+                const data = await res.json();
+
+                if (!res.ok) {
+                    throw new Error(data.error || 'Login failed');
+                }
+
+                myName = data.name;
+                currentUserEmail = data.email;
+                myPeerId = data.peerId; // Calculated by backend
+
+                document.getElementById('user-name-display').innerText = myName;
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('lobby-screen').classList.remove('hidden');
+                document.getElementById('lobby-screen').classList.add('flex'); // Ensure flex is added back
+
+            } catch (err) {
+                errorDiv.innerText = err.message;
+                errorDiv.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "Enter";
+            }
+        }
+
+        async function createMeeting() {
+            // Name is already set from login
             isHost = true;
             showToast("Initializing secure room...");
-            if(await startLocalStream()) initPeer(null);
+            if(await startLocalStream()) initPeer(myPeerId);
         }
 
         async function joinMeeting() {
             const roomId = inputs.meetingId.value.trim();
             if (!roomId) return showToast("Please enter a valid code");
             
-            if(inputs.displayName.value.trim()) {
-                myName = inputs.displayName.value.trim();
-            } else {
-                myName = "Guest";
-            }
-
+            // Name is already set from login
             isHost = false;
             activeRoomId = roomId; 
             showToast("Connecting to room...");
-            if(await startLocalStream()) initPeer(null, roomId);
+            if(await startLocalStream()) initPeer(myPeerId, roomId);
         }
         
         function joinMeetingMobile() {
             const roomId = document.getElementById('meeting-id-input-mobile').value.trim();
-            const nameVal = document.getElementById('display-name-mobile').value.trim();
             
             if (!roomId) return showToast("Please enter a valid code");
             
-            myName = nameVal || "Mobile Guest";
             isHost = false;
             activeRoomId = roomId;
-            startLocalStream().then(ok => { if(ok) initPeer(null, roomId); });
+            startLocalStream().then(ok => { if(ok) initPeer(myPeerId, roomId); });
         }
 
         async function startLocalStream() {
@@ -427,6 +486,14 @@
                 document.getElementById('lobby-screen').classList.add('hidden');
                 document.getElementById('meeting-screen').classList.remove('hidden');
                 document.getElementById('meeting-screen').classList.add('flex');
+
+                // Register status with backend
+                await fetch('/api/register-connection', {
+                     method: 'POST',
+                     headers: { 'Content-Type': 'application/json' },
+                     body: JSON.stringify({ email: currentUserEmail, peerId: myPeerId })
+                });
+
                 return true;
             } catch (err) {
                 console.error(err);
@@ -436,11 +503,15 @@
         }
 
         function initPeer(customId, hostIdToConnect = null) {
+            // Note: peerConfig.path should be /peerjs/myapp based on server.js config
+            // In server.js: app.use('/peerjs', peerServer) and peerServer has path: '/myapp'
+            // This means the URL is /peerjs/myapp/
+
             peer = new Peer(customId, {
                 host: peerConfig.host,
                 port: peerConfig.port,
-                path: peerConfig.path,
-                secure: true,
+                path: '/peerjs/myapp', // Corrected path
+                secure: window.location.protocol === 'https:',
                 debug: 1
             });
 
@@ -463,7 +534,12 @@
 
             peer.on('error', (err) => {
                 console.error(err);
-                showToast("Connection Error. Retrying...");
+                if(err.type === 'unavailable-id') {
+                     showToast("This account is already connected elsewhere.");
+                     setTimeout(() => window.location.reload(), 2000);
+                } else {
+                     showToast("Connection Error. Retrying...");
+                }
             });
         }
 
@@ -835,7 +911,16 @@
             }
         }
 
-        function endCall() { window.location.reload(); }
+        function endCall() {
+            // Notify backend we are leaving
+            fetch('/api/status', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: currentUserEmail, status: false })
+            }).finally(() => {
+                window.location.reload();
+            });
+        }
 
         function copyMeetingLink() {
             if(!activeRoomId) return;
@@ -849,6 +934,14 @@
             t.classList.remove('opacity-0', 'translate-y-10');
             setTimeout(() => t.classList.add('opacity-0', 'translate-y-10'), 3000);
         }
+
+        // Handle window close
+        window.addEventListener('beforeunload', () => {
+             if (currentUserEmail) {
+                const data = JSON.stringify({ email: currentUserEmail, status: false });
+                navigator.sendBeacon('/api/status', data);
+             }
+        });
 
         init();
     </script>
